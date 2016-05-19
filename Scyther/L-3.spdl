@@ -1,0 +1,55 @@
+hashfunction SIGN;hashfunction KDF;hashfunction MUL;hashfunction ECP;hashfunction PI;hashfunction LOW;hashfunction HIG;hashfunction MAC;hashfunction CERT;
+protocol proto(B,A) {
+secret const  Pa,Ma,Qa,Pb,Mb,Qb,H2,H3:Nonce;
+	role A	{
+fresh ka:Nonce;
+var kb,Ib;
+macro Ka = ECP(ka,Pb);
+macro Kb = ECP(kb,Pa);
+macro CertA = {CERT(A,A,pk(A))}sk(B);
+macro CertB = {CERT(B,B,pk(B))}sk(A);
+macro Qba = ECP(Ma,Qa,sk(A),Kb);
+macro Rba = ECP(Mb,Qb,ka,pk(B));
+macro Tba = KDF(PI(Qba),PI(Rba),A,Ib);
+macro Kba = LOW(Tba);
+macro Mba = HIG(Tba); /*   HIG(KDF(PI(ECP(Ma,Qa,sk(A),Kb)),PI( ECP(Mb,Qb,ka,pk(B))),A,Ib))    */
+
+send_1(A,B,A,CertA,Ka);
+recv_2(B,A,Ib,CertB,Kb,{MAC(H2,PI(Kb),PI(Ka),B,A)}HIG( KDF(PI(ECP(Ma,Qa,ka,pk(A))) , PI(ECP(Mb,Qb,sk(B),Ka)) , A , B)));
+match(Ib,B);
+send_3(A,B,{MAC(H3,PI(Ka),PI(Kb),A,Ib)}Mba);
+claim(A,Secret,Tba);
+claim(A,Secret,ka);
+claim(A,Secret,kb);
+claim(A,Alive);
+claim(A,Nisynch);
+claim(A,Niagree);
+claim(A,Weakagree);	}
+	role B	{
+fresh kb:Nonce;
+var ka,Ia;
+
+/*Kab = LOW(KDF(PI(ECP(Ma,Qa,ka,pk(A))),PI(ECP(Mb,Qb,sk(B),Ka)),Ia,B));
+Kba = LOW(KDF(PI(ECP(Ma,Qa,sk(A),Kb)) , PI(ECP(Mb,Qb,ka,pk(B))),A,Ib));
+*/
+macro Ka = ECP(ka,Pb);
+macro Kb = ECP(kb,Pa);
+macro CertA = {CERT(A,A,pk(A))}sk(B);
+macro CertB = {CERT(B,B,pk(B))}sk(A);
+macro Qab = ECP(Ma,Qa,ka,pk(A));
+macro Rab = ECP(Mb,Qb,sk(B),Ka);
+macro Tab = KDF(PI(Qab) , PI(Rab) , Ia , B);
+macro Kab = LOW(Tab);
+macro Mab = HIG(Tab); /*     HIG( KDF(PI(ECP(Ma,Qa,ka,pk(A));) , PI(ECP(Mb,Qb,sk(B),Ka);) , Ia , B))      */
+recv_1(A,B,Ia,CertA,Ka);
+match(Ia,A);
+send_2(B,A,B,CertB,Kb,{MAC(H2,PI(Kb),PI(Ka),B,Ia)}Mab);
+recv_3(A,B,{MAC(H3,PI(Ka),PI(Kb),A,B)}HIG(KDF(PI(ECP(Ma,Qa,sk(A),Kb)),PI( ECP(Mb,Qb,ka,pk(B))),A,B)));
+
+claim(B,Secret,Tab);
+claim(B,Secret,ka);
+claim(B,Secret,kb);
+claim(B,Alive);
+claim(B,Nisynch);
+claim(B,Niagree);
+claim(B,Weakagree);}}

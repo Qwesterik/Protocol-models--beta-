@@ -1,0 +1,73 @@
+hashfunction Sign;
+hashfunction Kex;
+hashfunction KDF;
+hashfunction MUL;
+
+protocol proto(B,A)
+{
+	role A
+	{
+
+fresh T1,T4,REQUEST:Nonce;
+fresh H1,H3,H5:Nonce;
+fresh Na,ka:Nonce;
+
+var T2,T3,T5,REPLY;
+var H2,H4,H6;
+var Nb,kb;
+
+send_1(A,B,H1,Na,T1,{Sign(H1,A,Na,T1,B)}sk(A) ); 
+
+recv_2(B,A,H2,Nb,T2,{Sign(H2,A,Na,T1,B,Nb,T2)}sk(B));  
+
+send_3(A,B,H3,Kex(ka),{Sign(H3,A,Na,B,Nb,Kex(ka))}sk(A));
+
+recv_4(B,A,H4,Kex(kb),{T3}KDF(MUL(kb,Kex(ka)),Na,Nb),{Sign(H4,A,Na,B,Nb,Kex(ka),Kex(kb),T3)}sk(B));
+
+send_5(A,B,H5,{T4,REQUEST}KDF(MUL(ka,Kex(kb)),Na,Nb),{Sign(H5,A,Na,B,Nb,Kex(ka),Kex(kb),T3,T4,REQUEST)}sk(A));
+
+recv_6(B,A,H6,{T5,REPLY}KDF(MUL(kb,Kex(ka)),Na,Nb),{Sign(H6,A,Na,B,Nb,Kex(ka),Kex(kb),T3,T5,REQUEST,REPLY)}sk(B));
+
+claim(A,Secret,REPLY);
+claim(A,Secret,REQUEST);
+claim(A,Secret,ka);
+claim(A,Secret,KDF( MUL(ka,Kex(kb)),Na,Nb ));
+claim(A,Alive);
+claim(A,Nisynch);
+claim(A,Niagree);
+claim(A,Weakagree);
+	}	
+	
+	role B
+	{
+
+fresh T2,T3,T5,REPLY:Nonce;
+fresh H2,H4,H6:Nonce;
+fresh Nb,kb:Nonce;
+
+var T1,T4,REQUEST;
+var H1,H3,H5;
+var Na,ka;
+
+recv_1(A,B,H1,Na,T1,{Sign(H1,A,Na,T1,B)}sk(A)  );
+
+send_2(B,A,H2,Nb,T2,{Sign(H2,A,Na,T1,B,Nb,T2)}sk(B));
+
+recv_3(A,B,H3,Kex(ka),{Sign(H3,A,Na,B,Nb,Kex(ka))}sk(A));
+
+send_4(B,A,H4,Kex(kb),{T3}KDF(MUL(kb,Kex(ka)),Na,Nb) , {Sign(H4,A,Na,B,Nb,Kex(ka),Kex(kb),T3)}sk(B));
+
+recv_5(A,B,H5,{T4,REQUEST}KDF( MUL(ka,Kex(kb)),Na,Nb ) , {Sign(H5,A,Na,B,Nb,Kex(ka),Kex(kb),T3,T4,REQUEST)}sk(A));
+
+send_6(B,A,H6 , {T5,REPLY}KDF(MUL(kb,Kex(ka)),Na,Nb) , {Sign(H6,A,Na,B,Nb,Kex(ka),Kex(kb),T3,T5,REQUEST,REPLY)}sk(B));
+
+claim(B,Secret,REPLY);
+claim(B,Secret,REQUEST);
+claim(B,Secret,kb);
+claim(B,Secret,KDF(MUL(kb,Kex(ka)),Na,Nb));
+claim(B,Alive);
+claim(B,Nisynch);
+claim(B,Niagree);
+claim(B,Weakagree);
+	}
+}

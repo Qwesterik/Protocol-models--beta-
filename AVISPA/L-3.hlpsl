@@ -1,0 +1,151 @@
+role alice ( 
+	A,B:agent,
+	Ya,Yb:public_key,
+	Ia:nat,
+	P1,M1,Q1:nat,
+	P2,M2,Q2:nat,
+	H2,H3:text,
+	Sign,KDF,CERT,MUL,PI,LOW,HIG,MAC: function,
+	SND,RCV:channel(dy)
+	)
+played_by A def=
+local 
+	Ib,K_a,K_b:nat, 
+	Ka,Kb,CertificateB,Qba,Rba,Tba,TagB,TagA,Kba,Mba,CertificateA,H4:message,
+	State : nat
+init State := 0
+transition
+
+1. State = 0 /\ RCV(start)
+=|> State' := 1 /\ 
+K_a' := new() /\
+Ka' := MUL(K_a'.P2) /\
+CertificateA' := CERT(Ia.Ya) /\
+SND(Ia.CertificateA'.Ka') /\ witness(A,B,ss1,Ia.CertificateA'.Ka')
+
+
+2. State = 1 /\ RCV(Ib'.CertificateB'.Kb'.{MAC(H2.PI(Kb').PI(Ka).Ib'.Ia)}_HIG(KDF(PI(MUL(M1.Q1.K_b'.Ya)).PI(MUL(M2.Q2.inv(Yb).Ka)).Ia.Ib'))) 
+/\ CertificateB' = CERT(Ib.Yb) 
+=|>
+State' := 2 /\
+Qba' := MUL(M1.Q1.inv(Ya).Kb') /\
+Rba' := MUL(M2.Q2.K_a.Yb) /\
+Tba' := KDF(PI(Qba').PI(Rba').Ia.Ib') /\
+Kba' := LOW(Tba') /\
+Mba' := HIG(Tba') /\
+TagA' := {MAC(H3.PI(Ka).PI(Kb').Ia.Ib')}_Mba' /\
+SND(TagA') 
+/\ secret(Kba,secka,A)
+/\ request(A,B,ss2,Ib'.CertificateB'.Kb'.{MAC(H2.PI(Kb').PI(Ka).Ib'.Ia)}_HIG(KDF(PI(MUL(M1.Q1.K_b'.Ya)).PI(MUL(M2.Q2.inv(Yb).Ka)).Ia.Ib')))
+/\ witness(A,B,ss3,TagA')
+
+
+end role
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role bob (
+	A,B:agent,
+	Ya,Yb:public_key,
+	Ib:nat,
+	P1,M1,Q1:nat,
+	P2,M2,Q2:nat,
+	H2,H3:text,
+	Sign,KDF,CERT,MUL,PI,LOW,HIG,MAC:function,
+	SND,RCV:channel(dy)
+	)	
+played_by B def=
+local
+	Ia:nat,
+	K_b,K_a:nat,
+	Ka,Kb,Qab,Rab,Tab,Kab,Mab,TagA,TagB,CertificateB,CertificateA:message,
+	State:nat
+init State := 10
+transition
+
+10. State =10 /\ RCV(Ia'.CertificateA'.Ka') /\ CertificateA' = CERT(Ia.Ya)
+=|> State' := 20 /\ 
+K_b' := new() /\
+Kb' := MUL(K_b'.P1) /\
+Qab' := MUL(M1.Q1.K_b.Ya) /\
+Rab' := MUL(M2.Q2.inv(Yb).Ka') /\
+Tab' := KDF(PI(Qab').PI(Rab').Ia'.Ib) /\
+Kab' := LOW(Tab') /\
+Mab' := HIG(Tab') /\
+TagB' := {MAC(H2.PI(Kb').PI(Ka').Ib.Ia')}_Mab' /\
+CertificateB' := CERT(Ib.Yb) /\
+SND(Ib.CertificateB'.Kb'.TagB') 
+/\ secret(Kab,seckb,B) 
+/\ request(B,A,ss1,Ia'.CertificateA'.Ka')
+/\ witness(B,A,ss2,Ib.CertificateB'.Kb'.TagB')
+
+
+
+20. State = 20 /\ RCV({MAC(H3.PI(Ka).PI(Kb).Ia.Ib)}_HIG(KDF(PI(MUL(M1.Q1.inv(Ya).Kb)).PI(MUL(M2.Q2.K_a'.Yb)).Ia.Ib)))
+=|>
+State' := 40 /\ SND(Ka') /\ request(B,A,ss3,{MAC(H3.PI(Ka).PI(Kb).Ia.Ib)}_HIG(KDF(PI(MUL(M1.Q1.inv(Ya).Kb)).PI(MUL(M2.Q2.K_a'.Yb)).Ia.Ib)))
+
+% End
+
+end role
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role session (A,B:agent,Ya,Yb:public_key,Ia,Ib:nat,P1,M1,Q1,P2,M2,Q2:nat,H2,H3:text,Sign,KDF,CERT,MUL,PI,LOW,HIG,MAC:function )
+def=
+local SA,SB,RA,RB : channel (dy)
+
+composition
+
+alice(A,B,Ya,Yb,Ia,P1,M1,Q1,P2,M2,Q2,H2,H3,Sign,KDF,CERT,MUL,PI,LOW,HIG,MAC,SA,RA) 
+/\ bob(A,B,Ya,Yb,Ib,P1,M1,Q1,P2,M2,Q2,H2,H3,Sign,KDF,CERT,MUL,PI,LOW,HIG,MAC,SB,RB)
+
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role environment()
+def=
+
+const a,b:agent,
+ss1,ss2,ss3,secka,seckb: protocol_id,
+ya,yb:public_key,
+ia,ib:nat,
+p1,m1,q1:nat,
+p2,m2,q2:nat,
+h2,h3:text,
+sign:function,
+kdf:function,
+cert:function,
+mul:function,
+pi:function,
+low:function,
+hig:function,
+mac:function
+
+intruder_knowledge = {a,b,ya,yb,sign,kdf,cert,mul,pi,low,hig,mac,p1,m1,q1,p2,m2,q2,h2,h3}
+
+composition
+
+session(a,b,ya,yb,ia,ib,p1,m1,q1,p2,m2,q2,h2,h3,sign,kdf,cert,mul,pi,low,hig,mac)
+
+end role
+
+goal
+	authentication_on ss1
+	authentication_on ss2
+	authentication_on ss3
+	secrecy_of seckb
+	secrecy_of secka
+end goal
+
+environment()
+
+
+
+
+
+
+
+
+
+
+

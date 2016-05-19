@@ -1,0 +1,109 @@
+param traceDisplay = long.
+param attacker = active.
+param reconstructTrace = true.
+
+free c.
+
+fun true/0.
+fun false/0.
+fun cert/3.
+
+fun KDF/4.
+fun LOW/1.
+fun HIG/1.
+fun MAC/2.
+
+fun public_sign_key/1.
+fun Sign/2.
+reduc Checksign(Sign(key,msg),public_sign_key(key),msg) = true.
+
+fun mul/2.
+fun pi/1.
+fun Point_Of_Curve/2.
+fun CURVE/5.
+reduc Point_Check(CURVE(P,a,b,m,q),Point_Of_Curve(CURVE(P,a,b,m,q),mul(k,P2))) = true.
+
+private reduc get_from_cert(cert(sec_key,mul(sec_key,P),ID)) = mul(sec_key,P).
+
+reduc MAC_Check(MAC(HIG(KDF(pi(mul((m1,q1),mul(kb,mul(sa,P1)))),pi(mul((m2,q2),mul(sb,Point_Of_Curve(CURVE(P2,a2,b2,m2,q2),mul(ka,P2))))),Ia,Ib)),msg),MAC(HIG(KDF(pi(mul((m1,q1),mul(sa,Point_Of_Curve(E1,mul(kb,P1))))),pi(mul((m2,q2),mul(ka,mul(sb,P2)))),Ia,Ib')),msg)) = true.
+
+query attacker:YES.
+
+process
+
+new Ia;
+new Ib;
+
+new P1;
+new a1;
+new b1;
+new m1;
+new q1;
+new P2;
+new a2;
+new b2;
+new m2;
+new q2;
+
+new h2;
+new h3;
+new YES;
+new start;
+
+new sa;
+new sb;
+
+let E1 = CURVE(P1,a1,b1,m1,q1) in
+let E2 = CURVE(P2,a2,b2,m2,q2) in
+let SA = mul(sa,P1) in
+let SB = mul(sb,P2) in
+let certA = cert(sa,SA,Ia) in
+let certB = cert(sb,SB,Ib) in
+out(c,start);
+
+(
+
+new ka;
+let KA = Point_Of_Curve(E2,mul(ka,P2)) in
+let CERTA = cert(sa,SA,Ia) in
+out(c,(Ia,CERTA,KA));
+
+in(c,(Ib',CERTB,KB,tagB));
+if CERTB = certB then
+if Point_Check(E1,KB) = true then
+let SB' = get_from_cert(CERTB) in
+let Qba = mul((m1,q1),mul(sa,KB)) in
+let Rba = mul((m2,q2),mul(ka,SB')) in
+let Tba = KDF(pi(Qba),pi(Rba),Ia,Ib') in
+let Kba = LOW(Tba) in
+let Mba = HIG(Tba) in
+let tagB' = MAC(Mba,(h2,pi(KB),pi(KA),Ib',Ia)) in
+if MAC_Check(tagB,tagB') = true then
+let tagA = MAC(Mba,(h3,pi(KA),pi(KB),Ia,Ib')) in
+out(c,tagA)
+
+)
+|
+(
+
+in(c,(Ia',CERTA,KA));
+if CERTA = certA then
+if Point_Check(E2,KA) = true then
+let SA' = get_from_cert(CERTA) in
+new kb;
+let KB = Point_Of_Curve(E1,mul(kb,P1)) in
+let Qab = mul((m1,q1),mul(kb,SA')) in
+let Rab = mul((m2,q2),mul(sb,KA)) in
+let Tab = KDF(pi(Qab),pi(Rab),Ia',Ib) in
+let Kab = LOW(Tab) in
+let Mab = HIG(Tab) in
+let tagB = MAC(Mab,(h2,pi(KB),pi(KA),Ib,Ia')) in
+let CERTB = cert(sb,SB,Ib) in
+out(c,(Ib,CERTB,KB,tagB));
+
+in(c,tagA);
+let tagA' = MAC(Mab,(h3,pi(KA),pi(KB),Ia',Ib)) in
+if MAC_Check(tagA',tagA) = true then
+out(c,YES)
+
+)

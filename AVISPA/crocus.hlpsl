@@ -1,0 +1,155 @@
+role alice ( 
+	A,B:agent,
+	Ya,Yb:public_key,
+	Sign,KDF,ECP,KEX: function,
+	SND,RCV:channel(dy)
+	)
+played_by A def=
+local 
+	Na,Nb,SID,Rb:nat,
+	Ka,Kb:nat, %%% Kex() --->>> Ka Ra
+	T1,T2,T3,T4,H1,H2,H4,H3,H5,H6,REPLY,REQ:text,
+	ET1,ET2,ET3,S1,S2,S3,S4,S5,S6:message,
+	State : nat
+init State := 0
+transition
+
+1. State = 0 /\ RCV(start)
+=|> State' := 1 
+/\ H1' := new() 
+/\ Na' := new()
+/\ T1' := new()
+/\ S1' := {Sign(H1'.A.Na'.T1'.B)}_inv(Ya)
+/\ SND(H1'.Na'.T1'.S1') /\ witness(A,B,aut1,H1'.Na'.T1'.S1')
+
+2. State = 1 /\ RCV(H2'.Nb'.T2'.S2') /\ S2' = {Sign(H2'.A.Na'.T1'.B.Nb'.T2')}_inv(Yb)
+=|> State' := 2 
+/\ Ka' := new()
+/\ H3':= new()
+/\ S3' := {Sign(H3'.A.Na.B.Nb.KEX(Ka'))}_inv(Ya)
+/\ SND(H3'.KEX(Ka').S3') /\ request(A,B,aut2,H2'.Nb'.T2'.S2') /\ witness(A,B,aut3,H3'.KEX(Ka').S3')
+
+3. State = 2 /\ RCV(H4'.KEX(Kb').ET1'.{Sign(H4'.A.Na.B.Nb.KEX(Ka').KEX(Kb').T3')}_inv(Yb)) 
+=|> State' := 3 
+/\ H5' := new()
+/\ T4' := new()
+/\ REQ' := new()
+/\ ET2' := {T4'.REQ'}_KDF(ECP(Ka,KEX(Kb')))
+/\ S5' := {Sign(H5'.A.Na.B.Nb.KEX(Ka).KEX(Kb).T3.T4'.REQ')}_inv(Ya)
+/\ SND(H5'.ET2'.S5') /\ request(A,B,aut4,H4'.KEX(Kb').ET1'.{Sign(H4'.A.Na.B.Nb.KEX(Ka').KEX(Kb').T3')}_inv(Yb)) /\ witness(A,B,aut5,H5'.ET2'.S5')
+/\ secret(REQ,sec1,A)
+/\ secret(REQ,sec1,B)
+
+4. State = 3 /\ RCV(H6'.ET3'.{Sign(H6'.A.Na.B.Nb.KEX(Ka).KEX(Kb).T3.T4'.REQ'.REPLY')}_inv(Yb))
+=|>
+State' := 4 /\ request(A,B,aut6,H6'.ET3'.{Sign(H6'.A.Na.B.Nb.KEX(Ka).KEX(Kb).T3.T4'.REQ'.REPLY')}_inv(Yb)) /\ secret(REPLY,sec2,A) /\ secret(REPLY,sec2,B)
+
+end role
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role bob (
+	A,B:agent,
+	Ya,Yb:public_key,
+	Sign,KDF,ECP,KEX:function,
+	SND,RCV:channel(dy)
+	)	
+played_by B def=
+local
+	Nb,Na,Ra,SID,Q,Kb,Ka,Rb:nat,
+	T2,T3,H1,H2,H3,H4,H5,H6,T4,REQ,REPLY,T1,TT:text,
+	ET1,ET2,ET3,S1,S2,S3,S4,S5,S6,CK:message,
+	State:nat
+init State := 0
+transition
+
+1. State =0 /\ RCV(H1'.Na'.T1'.S1') /\ S1' = {Sign(H1'.A.Na'.T1'.B)}_inv(Ya)
+=|> State' := 1
+/\ H2' := new() 
+/\ Nb' := new()
+/\ T2' := new()
+/\ S2' := {Sign(H2'.A.Na'.T1'.B.Nb'.T2')}_inv(Yb)
+/\ SND(H2'.Nb'.T2'.S2') /\ request(B,A,aut1,H1'.Na'.T1'.S1') /\ witness(B,A,aut2,H2'.Nb'.T2'.S2')
+
+2. State = 1 /\ RCV(H3'.KEX(Ka').S3') /\ S3' = {Sign(H3'.A.Na.B.Nb.KEX(Ka'))}_inv(Ya)
+=|> State' := 2 
+/\ H4' :=new() 
+/\ Kb' := new()
+/\ T3' := new()
+/\ S4' := {Sign(H4'.A.Na.B.Nb.KEX(Ka').KEX(Kb').T3')}_inv(Yb)
+/\ ET1' := {T3'}_KDF(ECP(Kb'.KEX(Ka')).A.B)
+/\ SND(H4'.KEX(Kb').ET1'.S4') /\ request(B,A,aut3,H3'.KEX(Ka').S3') /\ witness(B,A,aut4,H4'.KEX(Kb').ET1'.S4')
+
+3. State = 2 /\ RCV(H5'.ET2'.S5') /\ S5' = {Sign(H5'.A.Na.B.Nb.KEX(Ka).KEX(Kb).T3'.T4'.REQ')}_inv(Ya)
+%%%%{T4'.REQ'}_KDF(ECP(Ka,KEX(Kb)) 
+=|> State':=3 
+/\ REPLY' := new()
+/\ H6' := new()
+/\ ET3' := {REPLY'}_KDF(ECP(Kb,KEX(Ka)))
+/\ S6' := {Sign(H6'.A.Na.B.Nb.KEX(Ka).KEX(Kb).T3.T4'.REQ'.REPLY')}_inv(Yb)
+/\ SND(H6'.ET3'.S6') 
+/\ secret(REPLY,sec2,A)
+/\ secret(REPLY,sec2,B)
+/\ secret(REQ,sec1,A)
+/\ secret(REQ,sec1,B)
+/\ request(B,A,aut5,H5'.ET2'.S5') /\ witness(B,A,aut6,H6'.ET3'.S6')
+
+
+end role
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role session ( A,B:agent,Ya,Yb:public_key,Sign,KDF,ECP,KEX:function )
+def=
+local SA,SB,RA,RB : channel (dy)
+
+composition
+
+alice(A,B,Ya,Yb,Sign,KDF,ECP,KEX,SA,RA) 
+/\ bob(A,B,Ya,Yb,Sign,KDF,ECP,KEX,SB,RB)
+
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role environment()
+def=
+
+const a,b:agent,
+sec1,sec2,aut1,aut2,aut3,aut4,aut5,aut6: protocol_id,
+ya,yb:public_key,
+sign:function,
+kdf:function,
+ecp:function,
+kex:function
+
+intruder_knowledge = {a,b,ya,yb,sign,kdf,ecp,kex}
+
+composition
+
+session(a,b,ya,yb,sign,kdf,ecp,kex)
+
+end role
+
+goal
+	authentication_on aut1
+	authentication_on aut2
+	authentication_on aut3
+	authentication_on aut4
+	authentication_on aut5
+	authentication_on aut6
+	secrecy_of sec1
+	secrecy_of sec2
+end goal
+
+
+environment()
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,99 @@
+param traceDisplay = long.
+param attacker = active.
+param reconstructTrace = true.
+
+free c.
+
+fun true/0.
+fun false/0.
+fun cert/2.
+
+fun KDF/3.
+fun LOW/1.
+fun HIG/1.
+fun MAC/2.
+
+fun public_sign_key/1.
+fun Sign/2.
+reduc Checksign(Sign(key,msg),public_sign_key(key),msg) = true.
+
+fun mul/2.
+fun pi/1.
+fun Point_Of_Curve/2.
+fun CURVE/5.
+reduc Point_Check(CURVE(P,a,b,m,q),Point_Of_Curve(CURVE(P,a,b,m,q),mul(k,P))) = true.
+
+reduc MAC_Check( MAC(HIG(KDF(pi(Point_Of_Curve(CURVE(P,a,b,m,q),mul((m,q),mul(ka,Point_Of_Curve(CURVE(P,a,b,m,q),mul(kb,P)))))),Ia,Ib)),msg) , MAC(HIG(KDF(pi(Point_Of_Curve(CURVE(P,a,b,m,q),mul((m,q),mul(kb,Point_Of_Curve(CURVE(P,a,b,m,q),mul(ka,P)))))),Ia,Ib)),msg) ) = true.
+
+query attacker:LOW(KDF(pi(mul((m,q),mul(kb,KA))),Ia,Ib)).
+
+process
+
+new Ia;
+new Ib;
+new Xa;
+new Xb;
+
+new P;
+new a;
+new b;
+new m;
+new q;
+
+new h2;
+new h3;
+new YES;
+
+let E = CURVE(P,a,b,m,q) in
+let certA = cert(Xa,Ia) in
+let certB = cert(Xb,Ib) in
+let Ya = public_sign_key(Xa) in
+let Yb = public_sign_key(Xb) in
+out(c,(Ya,Yb,certA,certB));
+
+(
+
+new ka;
+let CERTA = cert(Xa,Ia) in
+let KA = Point_Of_Curve(E,mul(ka,P)) in
+out(c,(Ia,KA));
+
+in(c,(Ib',CERTB,KB,autB,tagB));
+if CERTB = certB then
+if Checksign(autB,Yb,(pi(KB),pi(KA),Ia)) = true then
+if Point_Check(E,KB) = true then
+let Qba = Point_Of_Curve(E,mul((m,q),mul(ka,KB))) in
+let Tba = KDF(pi(Qba),Ia,Ib') in
+let Kba = LOW(Tba) in
+let Mba = HIG(Tba) in
+let tagB' = MAC(Mba,(h2,pi(KB),pi(KA),Ib',Ia)) in
+if MAC_Check(tagB,tagB') = true then
+let autA = Sign(Xa,(pi(KA),pi(KB),Ib')) in
+let tagA = MAC(Mba,(h3,pi(KA),pi(KB),Ia,Ib')) in
+out(c,(CERTA,autA,tagA))
+
+)
+|
+(
+
+in(c,(Ia',KA));
+if Point_Check(E,KA) = true then
+new kb;
+let KB = Point_Of_Curve(E,mul(kb,P)) in
+let Qab = Point_Of_Curve(E,mul((m,q),mul(kb,KA))) in
+let Tab = KDF(pi(Qab),Ia',Ib) in
+let Kab = LOW(Tab) in
+let Mab = HIG(Tab) in
+let autB = Sign(Xb,(pi(KB),pi(KA),Ia')) in
+let tagB = MAC(Mab,(h2,pi(KB),pi(KA),Ib,Ia')) in
+let CERTB = cert(Xb,Ib) in
+out(c,(Ib,CERTB,KB,autB,tagB));
+
+in(c,(CERTA,autA,tagA));
+if CERTA = certA then
+if Checksign(autA,Ya,(pi(KA),pi(KB),Ib)) = true then
+let tagA' = MAC(Mab,(h3,pi(KA),pi(KB),Ia,Ib)) in
+if MAC_Check(tagA,tagA') = true then
+out(c,YES)
+
+)

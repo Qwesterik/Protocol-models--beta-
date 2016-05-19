@@ -1,0 +1,103 @@
+param traceDisplay = long.
+param attacker = active.
+param reconstructTrace = true.
+
+free c.
+
+fun true/0.
+fun false/0.
+fun public_key/1.
+fun sign/2.
+fun Kex/1.
+fun ECP/2.
+fun KDF_SID/4.
+fun KDF_KEY/3.
+fun ENC/2.
+reduc DEC(KDF_KEY(ECP(k2,Kex(k1)),Na,Nb),ENC(KDF_KEY(ECP(k1,Kex(k2)),Na,Nb),msg)) = msg.
+reduc checksign(sign(key,msg), public_key(key),msg) = true.
+
+query attacker:REQUEST.
+query attacker:REPLY.
+query attacker:ka.
+query attacker:kb.
+query attacker:ECP(ka,Kex(kb)).
+query attacker:ECP(kb,Kex(ka)).
+
+process
+
+new Xa;
+new Xb;
+new Ia;
+new Ib;
+let Ya = public_key(Xa) in
+let Yb = public_key(Xb) in
+out(c,(Ya,Yb,Ia,Ib));
+
+(
+
+new Na;
+new T1;
+new H1;
+let S1 = sign(Xa,(H1,Ia,Na,T1,Ib)) in
+out(c,(H1,Na,T1,S1));
+
+in(c,(H2,Nb,T2,S2));
+new H3;
+new ka;
+if checksign(S2,Yb,(H2,Ia,Na,T1,Ib,Nb,T2)) = true then
+let Ra = Kex(ka) in
+let SID = KDF_SID(Na,Nb,Ia,Ib) in
+let S3 = sign(Xa,(H3,Ia,Na,Ib,Nb,Ra)) in
+out(c,(H3,Ra,S3));
+
+
+in(c,(H4,Rb,ET1,S4));	
+new H5;
+new T4;
+new REQUEST;
+let Q = ECP(ka,Rb) in
+let CK = KDF_KEY(Q,Na,Nb) in
+let T3 = DEC(CK,ET1) in
+if checksign(S4,Yb,(H4,Ia,Na,Ib,Nb,Ra,Rb,T3)) = true then
+let ET2 = ENC(CK,(T4,REQUEST)) in
+let S5 = sign(Xa,(H5,Ia,Na,Ib,Nb,Ra,Rb,T3,(T4,REQUEST))) in
+out(c,(H5,ET2,S5));
+
+in(c,(H6,ET3,S6));	
+new REQUEST_REPLY_END;
+let T6 = DEC(CK,ET3) in
+if checksign(S6,Yb,(H6,Ia,Na,Ib,Nb,Ra,Rb,T3,(T4,REQUEST),T6)) = true then
+out(c,REQUEST_REPLY_END)
+)
+|
+(
+
+in(c,(H1,Na,T1,S1));
+new Nb;
+new T2;
+new H2;
+let S2 = sign(Xb,(H2,Ia,Na,T1,Ib,Nb,T2)) in
+out(c,(H2,Nb,T2,S2));
+
+in(c,(H3,Ra,S3));
+new kb;
+new H4;
+new T3;
+if checksign(S3,Ya,(H3,Ia,Na,Ib,Nb,Ra)) = true then
+let Rb = Kex(kb) in
+let Q = ECP(kb,Ra) in
+let CK = KDF_KEY(Q,Na,Nb) in
+let SID = KDF_SID(Na,Nb,Ia,Ib) in
+let ET1 = ENC(CK,T3) in
+let S4 = sign(Xb,(H4,Ia,Na,Ib,Nb,Ra,Rb,T3)) in
+out(c,(H4,Rb,ET1,S4));
+
+in(c,(H5,ET2,S5));	
+new H6;
+new REPLY;
+let T5 = DEC(CK,ET2) in
+if checksign(S5,Ya,(H5,Ia,Na,Ib,Nb,Ra,Rb,T3,T5)) = true then
+let ET3 = ENC(CK,REPLY) in
+let S6 = sign(Xb,(H6,Ia,Na,Ib,Nb,Ra,Rb,T3,T5,REPLY)) in
+out(c,(H6,ET3,S6))
+)
