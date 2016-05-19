@@ -16,6 +16,7 @@ var T2,T3,T5,REPLY;
 var H2,H4,H6;
 var Nb,kb;
 
+
 send_1(A,B,H1,Na,T1,{Sign(H1,A,Na,T1,B)}sk(A) ); 
 
 recv_2(B,A,H2,Nb,T2,{Sign(H2,A,Na,T1,B,Nb,T2)}sk(B));  
